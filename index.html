@@ -426,6 +426,11 @@ body.unlocked .lock-notice{display:none;}
         <input type="checkbox" id="slack-include-comp" style="accent-color:var(--orange);width:15px;height:15px;cursor:pointer;">
         <span>⚔️ 경쟁사 검색량 포함 <span style="color:var(--text-muted);font-size:10px">(월 1회 권장)</span></span>
       </label>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.7px;display:block;margin-bottom:4px;">✏️ 하단 문구 (슬랙 메시지 끝에 추가)</label>
+        <textarea id="slack-footer-text" rows="2" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;resize:vertical;transition:border-color 0.2s;" placeholder="예: 대시보드 보기: https://...">📊 대시보드 보기: https://marketeryea-hub.github.io/tomtomi-online/</textarea>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">비워두면 기본 문구만 표시돼요. 슬랙 굵은 글씨는 *텍스트* 형식으로 쓸 수 있어요.</div>
+      </div>
       <button id="slack-send-btn" onclick="sendSlackReport()" style="width:100%;padding:10px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">📨 슬랙으로 리포트 전송</button>
       <div id="slack-status" style="display:none;margin-top:8px;font-size:12px;text-align:center"></div>
     </div>
@@ -914,6 +919,12 @@ function buildSlackReport(date) {
       });
       lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
+  }
+  // 사용자 하단 문구
+  const footerText = (document.getElementById('slack-footer-text')?.value||'').trim();
+  if(footerText) {
+    lines.push(footerText);
+    lines.push('');
   }
   lines.push('_톰토미 마케팅 대시보드에서 자동 생성_');
 
