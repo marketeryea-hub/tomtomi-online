@@ -419,21 +419,6 @@ body.unlocked .lock-notice{display:none;}
 <!-- ===================== 바로가기 ===================== -->
 <div class="page" id="page-tools">
   <div class="g2">
-    <div class="card" style="border:2px solid rgba(74,144,226,0.3)">
-      <div class="card-title" style="margin-bottom:8px">📨 슬랙 데일리 리포트</div>
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">CRM · 채널성과 · 키워드 TOP7을 슬랙 채널로 전송합니다.</p>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-bottom:10px;cursor:pointer;">
-        <input type="checkbox" id="slack-include-comp" style="accent-color:var(--orange);width:15px;height:15px;cursor:pointer;">
-        <span>⚔️ 경쟁사 검색량 포함 <span style="color:var(--text-muted);font-size:10px">(월 1회 권장)</span></span>
-      </label>
-      <div style="margin-bottom:10px;">
-        <label style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.7px;display:block;margin-bottom:4px;">✏️ 하단 문구 (슬랙 메시지 끝에 추가)</label>
-        <textarea id="slack-footer-text" rows="2" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;resize:vertical;transition:border-color 0.2s;" placeholder="예: 대시보드 보기: https://...">📊 대시보드 보기: https://marketeryea-hub.github.io/tomtomi-online/</textarea>
-        <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">비워두면 기본 문구만 표시돼요. 슬랙 굵은 글씨는 *텍스트* 형식으로 쓸 수 있어요.</div>
-      </div>
-      <button id="slack-send-btn" onclick="sendSlackReport()" style="width:100%;padding:10px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">📨 슬랙으로 리포트 전송</button>
-      <div id="slack-status" style="display:none;margin-top:8px;font-size:12px;text-align:center"></div>
-    </div>
     <div class="card">
       <div class="card-title" style="margin-bottom:12px">🔍 검색 트렌드</div>
       <div class="qlink-grid">
@@ -459,14 +444,6 @@ body.unlocked .lock-notice{display:none;}
         <a class="qlink" href="https://www.tiktok.com/@tomtomi" target="_blank"><div class="qlink-icon" style="background:rgba(0,0,0,0.06)">🎵</div><div><div class="qlink-name">틱톡</div><div class="qlink-desc">@tomtomi</div></div></a>
         <a class="qlink" href="https://analytics.google.com/" target="_blank"><div class="qlink-icon" style="background:rgba(66,133,244,0.12)">📊</div><div><div class="qlink-name">구글 애널리틱스</div><div class="qlink-desc">웹 트래픽 분석</div></div></a>
         <a class="qlink" href="https://searchadvisor.naver.com/" target="_blank"><div class="qlink-icon" style="background:rgba(3,199,90,0.12)">🔍</div><div><div class="qlink-name">서치어드바이저</div><div class="qlink-desc">SEO · 사이트 진단</div></div></a>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title" style="margin-bottom:12px">📝 메모</div>
-      <textarea id="tools-memo" placeholder="이번 달 주요 이슈, 캠페인 메모..." style="width:100%;height:100px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:12px;resize:vertical;outline:none;line-height:1.6"></textarea>
-      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-        <button class="btn btn-primary" onclick="saveMemo()">💾 저장</button>
-        <span id="memo-saved" style="font-size:11px;color:var(--green);display:none">✅ 저장됨</span>
       </div>
     </div>
   </div>
@@ -507,6 +484,31 @@ body.unlocked .lock-notice{display:none;}
         </div>
         <input type="file" id="main-file-input" accept=".xlsx,.xls" multiple style="display:none" onchange="handleMultiUpload(this)">
         <div id="upload-status" style="margin-top:12px;font-size:12px;display:none"></div>
+      </div>
+    </div>
+    <div class="g2" style="margin-top:14px;">
+      <div class="card" style="border:2px solid rgba(74,144,226,0.3)">
+        <div class="card-title" style="margin-bottom:8px">📨 슬랙 데일리 리포트</div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">CRM · 채널성과 · 키워드 TOP7을 슬랙 채널로 전송합니다.</p>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-bottom:10px;cursor:pointer;">
+          <input type="checkbox" id="slack-include-comp" style="accent-color:var(--orange);width:15px;height:15px;cursor:pointer;">
+          <span>⚔️ 경쟁사 검색량 포함 <span style="color:var(--text-muted);font-size:10px">(월 1회 권장)</span></span>
+        </label>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.7px;display:block;margin-bottom:4px;">✏️ 하단 문구 (슬랙 메시지 끝에 추가)</label>
+          <textarea id="slack-footer-text" rows="2" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;resize:vertical;transition:border-color 0.2s;" placeholder="예: 대시보드 보기: https://...">📊 대시보드 보기: https://marketeryea-hub.github.io/tomtomi-online/</textarea>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">비워두면 기본 문구만 표시돼요. 슬랙 굵은 글씨는 *텍스트* 형식으로 쓸 수 있어요.</div>
+        </div>
+        <button id="slack-send-btn" onclick="sendSlackReport()" style="width:100%;padding:10px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">📨 슬랙으로 리포트 전송</button>
+        <div id="slack-status" style="display:none;margin-top:8px;font-size:12px;text-align:center"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px">📝 메모</div>
+        <textarea id="tools-memo" placeholder="이번 달 주요 이슈, 캠페인 메모..." style="width:100%;height:100px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:12px;resize:vertical;outline:none;line-height:1.6"></textarea>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <button class="btn btn-primary" onclick="saveMemo()">💾 저장</button>
+          <span id="memo-saved" style="font-size:11px;color:var(--green);display:none">✅ 저장됨</span>
+        </div>
       </div>
     </div>
   </div>
@@ -2059,7 +2061,7 @@ function renderPage(page) {
   else if(page==='channel') renderChannel();
   else if(page==='keyword') renderKeyword();
   else if(page==='competitor') renderCompetitor();
-  else if(page==='tools') { const m=localStorage.getItem('tt-memo'); if(m) document.getElementById('tools-memo').value=m; }
+  else if(page==='tools' || page==='upload') { const m=localStorage.getItem('tt-memo'); if(m) { const el=document.getElementById('tools-memo'); if(el) el.value=m; } }
 }
 
 // ============================================================
