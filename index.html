@@ -489,17 +489,19 @@ body.unlocked .lock-notice{display:none;}
     <div class="g2" style="margin-top:14px;">
       <div class="card" style="border:2px solid rgba(74,144,226,0.3)">
         <div class="card-title" style="margin-bottom:8px">📨 슬랙 데일리 리포트</div>
-        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">CRM · 채널성과 · 키워드 TOP7을 슬랙 채널로 전송합니다.</p>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-bottom:10px;cursor:pointer;">
-          <input type="checkbox" id="slack-include-comp" style="accent-color:var(--orange);width:15px;height:15px;cursor:pointer;">
-          <span>⚔️ 경쟁사 검색량 포함 <span style="color:var(--text-muted);font-size:10px">(월 1회 권장)</span></span>
-        </label>
-        <div style="margin-bottom:10px;">
-          <label style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.7px;display:block;margin-bottom:4px;">✏️ 하단 문구 (슬랙 메시지 끝에 추가)</label>
-          <textarea id="slack-footer-text" rows="2" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;resize:vertical;transition:border-color 0.2s;" placeholder="예: 대시보드 보기: https://...">📊 대시보드 보기: https://marketeryea-hub.github.io/tomtomi-online/</textarea>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">비워두면 기본 문구만 표시돼요. 슬랙 굵은 글씨는 *텍스트* 형식으로 쓸 수 있어요.</div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">기간 필터에 맞는 데이터로 슬랙 메시지를 생성합니다. 전송 전에 자유롭게 수정 가능!</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text);cursor:pointer;">
+            <input type="checkbox" id="slack-include-comp" style="accent-color:var(--orange);width:15px;height:15px;cursor:pointer;">
+            <span>⚔️ 경쟁사 <span style="color:var(--text-muted);font-size:10px">(월 1회)</span></span>
+          </label>
+          <button class="btn btn-secondary" onclick="generateSlackPreview()" style="font-size:11px;padding:5px 12px;">🔄 미리보기 생성</button>
+          <span style="font-size:10px;color:var(--text-dim)">기간: <b id="slack-period-label">—</b></span>
         </div>
-        <button id="slack-send-btn" onclick="sendSlackReport()" style="width:100%;padding:10px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">📨 슬랙으로 리포트 전송</button>
+        <textarea id="slack-preview" rows="16" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px;color:var(--text);font-size:11px;font-family:'Noto Sans KR',monospace;outline:none;resize:vertical;transition:border-color 0.2s;line-height:1.7;" placeholder="🔄 미리보기 생성 버튼을 눌러주세요"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
+          <button id="slack-send-btn" onclick="sendSlackFromEditor()" style="flex:1;padding:10px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">📨 슬랙으로 전송</button>
+        </div>
         <div id="slack-status" style="display:none;margin-top:8px;font-size:12px;text-align:center"></div>
       </div>
       <div class="card">
@@ -822,15 +824,15 @@ function fmtMonthStr(val) {
 // ============================================================
 const SLACK_RELAY = 'https://tomtomi-slack-relay.vercel.app/api/slack';
 
-async function sendSlackReport() {
+async function sendSlackFromEditor() {
+  const preview = document.getElementById('slack-preview');
+  const msg = (preview?.value||'').trim();
+  if(!msg) { alert('미리보기를 먼저 생성해주세요!'); return; }
   const btn = document.getElementById('slack-send-btn');
   const status = document.getElementById('slack-status');
   if(btn) { btn.disabled=true; btn.textContent='⏳ 전송 중...'; }
   if(status) { status.style.display='block'; status.style.color='var(--text-muted)'; status.textContent='슬랙으로 리포트 전송 중...'; }
-
   try {
-    const today = filterTo || getKSTDate(-1);
-    const msg = buildSlackReport(today);
     const res = await fetch(SLACK_RELAY, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -839,19 +841,27 @@ async function sendSlackReport() {
     const data = await res.json();
     if(data.result === 'ok') {
       if(status) { status.style.color='var(--green)'; status.textContent='✅ 슬랙 전송 완료!'; }
-      if(btn) { btn.textContent='✅ 전송 완료'; setTimeout(()=>{btn.disabled=false;btn.textContent='📨 슬랙으로 리포트 전송';},3000); }
+      if(btn) { btn.textContent='✅ 전송 완료'; setTimeout(()=>{btn.disabled=false;btn.textContent='📨 슬랙으로 전송';},3000); }
     } else {
       throw new Error(data.error || '전송 실패');
     }
   } catch(e) {
     if(status) { status.style.color='var(--red,#c0392b)'; status.textContent='❌ 전송 실패: ' + e.message; }
-    if(btn) { btn.disabled=false; btn.textContent='📨 슬랙으로 리포트 전송'; }
+    if(btn) { btn.disabled=false; btn.textContent='📨 슬랙으로 전송'; }
   }
 }
 
-function buildSlackReport(date) {
+function generateSlackPreview() {
+  const msg = buildSlackReport();
+  document.getElementById('slack-preview').value = msg;
+  document.getElementById('slack-period-label').textContent = filterFrom + ' ~ ' + filterTo;
+}
+
+function buildSlackReport() {
   const lines = [];
-  lines.push('*🍊 톰토미 마케팅 데일리 리포트* — ' + date);
+  // 기간 필터 반영
+  const rangeLabel = (filterFrom === filterTo) ? filterFrom : filterFrom + ' ~ ' + filterTo;
+  lines.push('*🍊 톰토미 마케팅 데일리 리포트* — ' + rangeLabel);
   lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   // CRM
@@ -868,21 +878,20 @@ function buildSlackReport(date) {
   lines.push('• 틱톡 팔로워: *' + fmt(tokCur) + '명* ' + (tokD>=0?'▲':'▼') + ' ' + Math.abs(tokD) + '명' + tokPct);
   lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-  // 톰스 채널성과
+  // 톰스 채널성과 — 기간 필터 반영
   const chAgg = aggChannel('current');
   const chPrev = aggChannel('prev');
   const curVis = sumField(chAgg,'visits')||0, prvVis = sumField(chPrev,'visits')||0;
   const curRev = sumField(chAgg,'revenue')||0, prvRev = sumField(chPrev,'revenue')||0;
   const visitsDiff = curVis - prvVis;
   const revDiff = curRev - prvRev;
-  // 전환율: kw_inflow_raw의 orders를 합산
   const curOrders = (DB.kw_inflow_raw.filter(r=>inRange(r.date)).reduce((s,r)=>s+(r.orders||0),0))||0;
   const prev = getPrevRange();
   const prvOrders = (DB.kw_inflow_raw.filter(r=>r.date>=prev.from&&r.date<=prev.to).reduce((s,r)=>s+(r.orders||0),0))||0;
   const cvrCur = curVis>0?(curOrders/curVis*100).toFixed(1):'0';
   const cvrPrev = prvVis>0?(prvOrders/prvVis*100).toFixed(1):'0';
   const cvrDiff = (parseFloat(cvrCur)-parseFloat(cvrPrev)).toFixed(1);
-  lines.push('*💳 톰스 채널성과 (' + date + ')*');
+  lines.push('*💳 톰스 채널성과 (' + rangeLabel + ')*');
   lines.push('• 총 유입수: *' + fmt(curVis) + '명* ' + (visitsDiff>=0?'▲':'▼') + ' ' + fmt(Math.abs(visitsDiff)));
   lines.push('• 결제금액: *' + fmt(curRev,'money') + '원* ' + (revDiff>=0?'▲':'▼') + ' ' + fmt(Math.abs(revDiff),'money'));
   lines.push('• 전환율: *' + cvrCur + '%* ' + (parseFloat(cvrDiff)>=0?'▲':'▼') + ' ' + Math.abs(cvrDiff) + '%p');
@@ -910,11 +919,10 @@ function buildSlackReport(date) {
       const sortedBrands = tomEntry?[tomEntry,...others]:others;
       sortedBrands.forEach(([b,d])=>{
         const last = d.vals.slice(-1)[0]||0;
-        const prev = d.vals.slice(-2,-1)[0]||0;
-        const diff = last - prev;
-        const pct = prev>0?(' ('+((diff/prev)*100).toFixed(1)+'%)'):'';
+        const prev2 = d.vals.slice(-2,-1)[0]||0;
+        const diff = last - prev2;
+        const pct = prev2>0?(' ('+((diff/prev2)*100).toFixed(1)+'%)'):'';
         const arrow = diff>0?'▲':diff<0?'▼':'—';
-        const lastMonth = d.dates.slice(-1)[0]||'';
         const prevMonth = d.dates.slice(-2,-1)[0]||'';
         const isTom = b==='톰토미';
         lines.push((isTom?'• *':'• ') + b + (isTom?'*':'') + ': ' + fmt(last) + '회 ' + arrow + ' ' + fmt(Math.abs(diff)) + pct + (prevMonth?' vs '+prevMonth:''));
@@ -922,12 +930,7 @@ function buildSlackReport(date) {
       lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
   }
-  // 사용자 하단 문구
-  const footerText = (document.getElementById('slack-footer-text')?.value||'').trim();
-  if(footerText) {
-    lines.push(footerText);
-    lines.push('');
-  }
+  lines.push('📊 대시보드 보기: https://marketeryea-hub.github.io/tomtomi-online/');
   lines.push('_톰토미 마케팅 대시보드에서 자동 생성_');
 
   return lines.join('\n');
