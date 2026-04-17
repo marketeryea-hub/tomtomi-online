@@ -441,7 +441,7 @@ body.unlocked .lock-notice{display:none;}
       <div class="card-title" style="margin-bottom:12px">📱 소셜 미디어</div>
       <div class="qlink-grid">
         <a class="qlink" href="https://www.instagram.com/tomtomi_official/" target="_blank"><div class="qlink-icon" style="background:rgba(214,73,158,0.12)">📸</div><div><div class="qlink-name">인스타그램</div><div class="qlink-desc">@tomtomi_official</div></div></a>
-        <a class="qlink" href="https://www.tiktok.com/@tomtomibear" target="_blank"><div class="qlink-icon" style="background:rgba(0,0,0,0.06)">🎵</div><div><div class="qlink-name">틱톡</div><div class="qlink-desc">@tomtomibear</div></div></a>
+        <a class="qlink" href="https://www.tiktok.com/@tomtomi" target="_blank"><div class="qlink-icon" style="background:rgba(0,0,0,0.06)">🎵</div><div><div class="qlink-name">틱톡</div><div class="qlink-desc">@tomtomi</div></div></a>
         <a class="qlink" href="https://analytics.google.com/" target="_blank"><div class="qlink-icon" style="background:rgba(66,133,244,0.12)">📊</div><div><div class="qlink-name">구글 애널리틱스</div><div class="qlink-desc">웹 트래픽 분석</div></div></a>
         <a class="qlink" href="https://searchadvisor.naver.com/" target="_blank"><div class="qlink-icon" style="background:rgba(3,199,90,0.12)">🔍</div><div><div class="qlink-name">서치어드바이저</div><div class="qlink-desc">SEO · 사이트 진단</div></div></a>
       </div>
@@ -1676,14 +1676,19 @@ function renderOverview() {
   const navAll  = DB.crm.naver.filter(d => d.date >= oneYearStr);
   const insAll  = DB.crm.insta.filter(d => d.date >= oneYearStr);
   const tokAll  = DB.crm.tiktok.filter(d => d.date >= oneYearStr);
+  // 통합 날짜 축: 세 채널의 날짜를 합쳐서 정렬
+  const allCrmDates = [...new Set([...navAll.map(d=>d.date), ...insAll.map(d=>d.date), ...tokAll.map(d=>d.date)])].sort();
+  const navMap = {}; navAll.forEach(d => navMap[d.date] = d.val);
+  const insMap = {}; insAll.forEach(d => insMap[d.date] = d.val);
+  const tokMap = {}; tokAll.forEach(d => tokMap[d.date] = d.val);
   mkChart('chart-crm-overview', {
     type: 'line',
     data: {
-      labels: navAll.map(d => d.date.slice(5)),
+      labels: allCrmDates.map(d => d.slice(5)),
       datasets: [
-        {label:'알림받기', data:navAll.map(d=>d.val), borderColor:C.naver, backgroundColor:'transparent', borderWidth:2, pointRadius:1, tension:0.4, yAxisID:'y'},
-        {label:'인스타',   data:insAll.map(d=>d.val), borderColor:C.insta, backgroundColor:'transparent', borderWidth:2, pointRadius:1, tension:0.4, yAxisID:'y2'},
-        {label:'틱톡',    data:tokAll.map(d=>d.val), borderColor:C.tiktok,backgroundColor:'transparent', borderWidth:1.5, pointRadius:1, tension:0.4, yAxisID:'y3', borderDash:[4,3]}
+        {label:'알림받기', data:allCrmDates.map(d=>navMap[d]??null), borderColor:C.naver, backgroundColor:'transparent', borderWidth:2, pointRadius:1, tension:0.4, yAxisID:'y', spanGaps:true},
+        {label:'인스타',   data:allCrmDates.map(d=>insMap[d]??null), borderColor:C.insta, backgroundColor:'transparent', borderWidth:2, pointRadius:1, tension:0.4, yAxisID:'y2', spanGaps:true},
+        {label:'틱톡',    data:allCrmDates.map(d=>tokMap[d]??null), borderColor:C.tiktok,backgroundColor:'transparent', borderWidth:1.5, pointRadius:1, tension:0.4, yAxisID:'y3', borderDash:[4,3], spanGaps:true}
       ]
     },
     options: {
