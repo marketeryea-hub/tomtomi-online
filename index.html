@@ -878,18 +878,29 @@ function buildSlackReport() {
   lines.push('• 틱톡 팔로워: *' + fmt(tokCur) + '명* ' + (tokD>=0?'▲':'▼') + ' ' + Math.abs(tokD) + '명' + tokPct);
   lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-  // 톰스 채널성과 — 기간 필터 반영
+  // 톰스 채널성과 — 대시보드 renderChannel()과 동일 로직
   const chAgg = aggChannel('current');
   const chPrev = aggChannel('prev');
   const curVis = sumField(chAgg,'visits')||0, prvVis = sumField(chPrev,'visits')||0;
   const curRev = sumField(chAgg,'revenue')||0, prvRev = sumField(chPrev,'revenue')||0;
   const visitsDiff = curVis - prvVis;
   const revDiff = curRev - prvRev;
-  const curOrders = (DB.kw_inflow_raw.filter(r=>inRange(r.date)).reduce((s,r)=>s+(r.orders||0),0))||0;
-  const prev = getPrevRange();
-  const prvOrders = (DB.kw_inflow_raw.filter(r=>r.date>=prev.from&&r.date<=prev.to).reduce((s,r)=>s+(r.orders||0),0))||0;
-  const cvrCur = curVis>0?(curOrders/curVis*100).toFixed(1):'0';
-  const cvrPrev = prvVis>0?(prvOrders/prvVis*100).toFixed(1):'0';
+  // 전환율: renderChannel과 동일하게 kw_inflow_raw의 orders를 채널그룹별 집계 후 합산
+  const slackOrderMap = {};
+  DB.kw_inflow_raw.filter(r=>inRange(r.date)).forEach(r=>{
+    if(!slackOrderMap[r.group]) slackOrderMap[r.group]=0;
+    slackOrderMap[r.group]+=(r.orders||0);
+  });
+  const totOrders = Object.values(slackOrderMap).reduce((s,v)=>s+v,0);
+  const prevOrderMap = {};
+  const prevR = getPrevRange();
+  DB.kw_inflow_raw.filter(r=>r.date>=prevR.from&&r.date<=prevR.to).forEach(r=>{
+    if(!prevOrderMap[r.group]) prevOrderMap[r.group]=0;
+    prevOrderMap[r.group]+=(r.orders||0);
+  });
+  const totOrdersPrev = Object.values(prevOrderMap).reduce((s,v)=>s+v,0);
+  const cvrCur = curVis>0?(totOrders/curVis*100).toFixed(1):'0';
+  const cvrPrev = prvVis>0?(totOrdersPrev/prvVis*100).toFixed(1):'0';
   const cvrDiff = (parseFloat(cvrCur)-parseFloat(cvrPrev)).toFixed(1);
   lines.push('*💳 톰스 채널성과 (' + rangeLabel + ')*');
   lines.push('• 총 유입수: *' + fmt(curVis) + '명* ' + (visitsDiff>=0?'▲':'▼') + ' ' + fmt(Math.abs(visitsDiff)));
