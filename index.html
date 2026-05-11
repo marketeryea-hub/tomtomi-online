@@ -320,6 +320,10 @@ body.unlocked .lock-notice{display:none;}
       <div class="card-hd"><div class="card-title">🎵 틱톡 팔로워</div></div>
       <div style="height:110px"><canvas id="chart-crm-tiktok"></canvas></div>
     </div>
+    <div class="card">
+      <div class="card-hd"><div class="card-title">🔗 쓰레드 팔로워</div></div>
+      <div style="height:110px"><canvas id="chart-crm-threads"></canvas></div>
+    </div>
   </div>
 
   <div class="insight-box">
@@ -441,6 +445,7 @@ body.unlocked .lock-notice{display:none;}
       <div class="card-title" style="margin-bottom:12px">📱 소셜 미디어</div>
       <div class="qlink-grid">
         <a class="qlink" href="https://www.instagram.com/tomtomi_official/" target="_blank"><div class="qlink-icon" style="background:rgba(214,73,158,0.12)">📸</div><div><div class="qlink-name">인스타그램</div><div class="qlink-desc">@tomtomi_official</div></div></a>
+        <a class="qlink" href="https://www.threads.net/@tomtomi_official" target="_blank"><div class="qlink-icon" style="background:rgba(0,149,246,0.12)">🔗</div><div><div class="qlink-name">쓰레드</div><div class="qlink-desc">@tomtomi_official</div></div></a>
         <a class="qlink" href="https://www.tiktok.com/@tomtomi" target="_blank"><div class="qlink-icon" style="background:rgba(0,0,0,0.06)">🎵</div><div><div class="qlink-name">틱톡</div><div class="qlink-desc">@tomtomi</div></div></a>
         <a class="qlink" href="https://analytics.google.com/" target="_blank"><div class="qlink-icon" style="background:rgba(66,133,244,0.12)">📊</div><div><div class="qlink-name">구글 애널리틱스</div><div class="qlink-desc">웹 트래픽 분석</div></div></a>
         <a class="qlink" href="https://searchadvisor.naver.com/" target="_blank"><div class="qlink-icon" style="background:rgba(3,199,90,0.12)">🔍</div><div><div class="qlink-name">서치어드바이저</div><div class="qlink-desc">SEO · 사이트 진단</div></div></a>
@@ -471,7 +476,7 @@ body.unlocked .lock-notice{display:none;}
           <div style="margin-top:8px"><strong style="color:var(--text)">③ 상품_검색채널_날짜.xlsx</strong></div>
           <div style="margin-left:12px">스마트스토어센터 → 데이터분석 → 판매분석 → 상품/검색채널</div>
           <div style="margin-top:10px;padding:8px 10px;background:rgba(42,157,110,0.08);border-radius:7px;font-size:11px;color:#207a52">
-            ✅ CRM (알림받기/인스타/틱톡)은 구글 시트에서 자동 로드<br>
+            ✅ CRM (알림받기/인스타/틱톡/쓰레드)은 구글 시트에서 자동 로드<br>
             ✅ 파일 업로드할 때마다 누적 저장 (이전 데이터 유지)
           </div>
         </div>
@@ -522,7 +527,7 @@ body.unlocked .lock-notice{display:none;}
 // ============================================================
 // DATA STORE
 // ============================================================
-let DB = { crm: {naver:[], insta:[], tiktok:[]}, daily_sales:[], channel_raw:[], kw_inflow_raw:[], kw_pay_raw:[], brand_search:{}, latest_date:'' };
+let DB = { crm: {naver:[], insta:[], tiktok:[], threads:[]}, daily_sales:[], channel_raw:[], kw_inflow_raw:[], kw_pay_raw:[], brand_search:{}, latest_date:'' };
 let DB_LOADING = true; // Supabase 로드 완료 전엔 업로드 차단
 
 
@@ -557,7 +562,7 @@ async function loadCRMFromSheet() {
     const firstCell = String(rows[0][0]||'').toLowerCase().trim();
     const hasHeader = !firstCell.match(/^\d{4}/); // 숫자로 시작하면 헤더 없음
     if(!hasHeader) {
-      // 헤더 없이 date,naver,insta,tiktok 순서로 파싱
+      // 헤더 없이 date,naver,insta,tiktok,threads 순서로 파싱
       console.log('CRM: 헤더 없음, 순서대로 파싱');
     }
     // 헤더 있으면 rows[1]부터, 없으면 rows[0]부터 (아래 루프는 rows[1]~이므로 OK)
@@ -568,12 +573,13 @@ async function loadCRMFromSheet() {
     const iNaver = hdr.findIndex(h => h==='naver' || h==='알림받기' || h==='smartstore');
     const iInsta = hdr.findIndex(h => h==='insta' || h==='instagram');
     const iTok   = hdr.findIndex(h => h==='tiktok' || h==='틱톡');
-    // 못찾으면 순서대로 (date=0, naver=1, insta=2, tiktok=3)
-    const ci = { date: iDate>=0?iDate:0, nav: iNaver>=0?iNaver:1, ins: iInsta>=0?iInsta:2, tok: iTok>=0?iTok:3 };
+    const iThrd  = hdr.findIndex(h => h==='threads' || h==='쓰레드');
+    // 못찾으면 순서대로 (date=0, naver=1, insta=2, tiktok=3, threads=4)
+    const ci = { date: iDate>=0?iDate:0, nav: iNaver>=0?iNaver:1, ins: iInsta>=0?iInsta:2, tok: iTok>=0?iTok:3, thrd: iThrd>=0?iThrd:4 };
     console.log('CRM 헤더 인덱스:', ci);
     console.log('CRM 첫번째 데이터행:', rows[1]);
     console.log('CRM 전체 행수:', rows.length);
-    const naver=[], insta=[], tiktok=[];
+    const naver=[], insta=[], tiktok=[], threads=[];
     for(let i=1; i<rows.length; i++) {
       const r = rows[i];
       if(!r[ci.date]) continue;
@@ -582,18 +588,19 @@ async function loadCRMFromSheet() {
       const vNav = parseInt(r[ci.nav]); if(!isNaN(vNav) && vNav>0) naver.push({date:d, val:vNav});
       const vIns = parseInt(r[ci.ins]); if(!isNaN(vIns) && vIns>0) insta.push({date:d, val:vIns});
       const vTok = parseInt(r[ci.tok]); if(!isNaN(vTok) && vTok>0) tiktok.push({date:d, val:vTok});
+      const vThrd = parseInt(r[ci.thrd]); if(!isNaN(vThrd) && vThrd>0) threads.push({date:d, val:vThrd});
     }
     // 날짜 오름차순 정렬
-    [naver, insta, tiktok].forEach(arr => arr.sort((a,b)=>a.date<b.date?-1:1));
-    DB.crm = { naver, insta, tiktok };
+    [naver, insta, tiktok, threads].forEach(arr => arr.sort((a,b)=>a.date<b.date?-1:1));
+    DB.crm = { naver, insta, tiktok, threads };
     // 최신 업데이트 날짜 갱신 (CRM 포함)
-    const crmLatest = [...naver,...insta,...tiktok].map(d=>d.date).sort().pop();
+    const crmLatest = [...naver,...insta,...tiktok,...threads].map(d=>d.date).sort().pop();
     if(crmLatest && (!DB.latest_date || crmLatest > DB.latest_date)) {
       DB.latest_date = crmLatest;
       const lc = document.getElementById('latestChip');
       if(lc) lc.textContent = '🔄 업데이트: ' + crmLatest;
     }
-    console.log(`CRM 로드 완료 — 알림받기 ${naver.length}건, 인스타 ${insta.length}건, 틱톡 ${tiktok.length}건`);
+    console.log(`CRM 로드 완료 — 알림받기 ${naver.length}건, 인스타 ${insta.length}건, 틱톡 ${tiktok.length}건, 쓰레드 ${threads.length}건`);
     // 현재 탭 갱신
     refreshAll();
   } catch(e) {
@@ -865,17 +872,19 @@ function buildSlackReport() {
   lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   // CRM
-  const nav = DB.crm.naver, ins = DB.crm.insta, tok = DB.crm.tiktok;
-  const navCur = getLatestCRM(nav)||0, insCur = getLatestCRM(ins)||0, tokCur = getLatestCRM(tok)||0;
-  const navP1 = getPrevCRM(nav,1), insP1 = getPrevCRM(ins,1), tokP1 = getPrevCRM(tok,1);
-  const navD = navP1!=null?navCur-navP1:0, insD = insP1!=null?insCur-insP1:0, tokD = tokP1!=null?tokCur-tokP1:0;
+  const nav = DB.crm.naver, ins = DB.crm.insta, tok = DB.crm.tiktok, thrd = DB.crm.threads;
+  const navCur = getLatestCRM(nav)||0, insCur = getLatestCRM(ins)||0, tokCur = getLatestCRM(tok)||0, thrdCur = getLatestCRM(thrd)||0;
+  const navP1 = getPrevCRM(nav,1), insP1 = getPrevCRM(ins,1), tokP1 = getPrevCRM(tok,1), thrdP1 = getPrevCRM(thrd,1);
+  const navD = navP1!=null?navCur-navP1:0, insD = insP1!=null?insCur-insP1:0, tokD = tokP1!=null?tokCur-tokP1:0, thrdD = thrdP1!=null?thrdCur-thrdP1:0;
   const navPct = navP1&&navP1>0?(' ('+((navD/navP1)*100).toFixed(1)+'%)'):'';
   const insPct = insP1&&insP1>0?(' ('+((insD/insP1)*100).toFixed(1)+'%)'):'';
   const tokPct = tokP1&&tokP1>0?(' ('+((tokD/tokP1)*100).toFixed(1)+'%)'):'';
+  const thrdPct = thrdP1&&thrdP1>0?(' ('+((thrdD/thrdP1)*100).toFixed(1)+'%)'):'';
   lines.push('*📊 CRM (온드미디어)*');
   lines.push('• 스마트스토어 알림받기: *' + fmt(navCur) + '명* ' + (navD>=0?'▲':'▼') + ' ' + Math.abs(navD) + '명' + navPct);
   lines.push('• 인스타그램 팔로워: *' + fmt(insCur) + '명* ' + (insD>=0?'▲':'▼') + ' ' + Math.abs(insD) + '명' + insPct);
   lines.push('• 틱톡 팔로워: *' + fmt(tokCur) + '명* ' + (tokD>=0?'▲':'▼') + ' ' + Math.abs(tokD) + '명' + tokPct);
+  lines.push('• 쓰레드 팔로워: *' + fmt(thrdCur) + '명* ' + (thrdD>=0?'▲':'▼') + ' ' + Math.abs(thrdD) + '명' + thrdPct);
   lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   // 톰스 채널성과 — 대시보드 renderChannel()과 동일 로직
@@ -1034,7 +1043,7 @@ function mkChart(id, config) {
   CHARTS[id] = new Chart(el.getContext('2d'), config);
 }
 const GRID = '#e8e0d0';
-const C = {orange:'#d95f2b', yellow:'#e8a020', green:'#2a9d6e', blue:'#2266a0', purple:'#7c3aed', pink:'#c2185b', naver:'#00913b', insta:'#b5006e', tiktok:'#555555'};
+const C = {orange:'#d95f2b', yellow:'#e8a020', green:'#2a9d6e', blue:'#2266a0', purple:'#7c3aed', pink:'#c2185b', naver:'#00913b', insta:'#b5006e', tiktok:'#555555', threads:'#0095f6'};
 const BRAND_C = {'톰토미':'#d95f2b','핑크퐁':'#c2185b','코코몽':'#0891b2','주니토니':'#059669','치타부':'#d97706','베베핀':'#7c3aed','로티프렌즈':'#e8a020','보람튜브':'#2266a0'};
 const CH_COLORS = ['#d95f2b','#e8a020','#2a9d6e','#2266a0','#7c3aed','#c2185b','#9e8a70','#4aa8c0'];
 
@@ -1136,7 +1145,7 @@ function normalizeCompDate(raw) {
 }
 
 function parseSheets(sheets) {
-  const crm_naver=[], crm_insta=[], crm_tiktok=[];
+  const crm_naver=[], crm_insta=[], crm_tiktok=[], crm_threads=[];
   const channel_raw=[], kw_inflow_raw=[], kw_pay_raw=[];
   const brand_search={};
 
@@ -1164,6 +1173,17 @@ function parseSheets(sheets) {
         if(raw7 !== undefined && raw7 !== null && raw7 !== '' && String(raw7) !== '팔로워') {
           const v = parseInt(raw7);
           if(!isNaN(v) && v > 0) crm_tiktok.push({date:d6, val:v});
+        }
+      }
+    }
+    // 쓰레드 (col 9,10) — 틱톡과 같은 구조
+    if(r.length > 9) {
+      const d9 = fmtDateStr(r[9]);
+      if(d9) {
+        const raw10 = r[10];
+        if(raw10 !== undefined && raw10 !== null && raw10 !== '' && String(raw10) !== '팔로워') {
+          const v = parseInt(raw10);
+          if(!isNaN(v) && v > 0) crm_threads.push({date:d9, val:v});
         }
       }
     }
@@ -1249,7 +1269,7 @@ function parseSheets(sheets) {
   const daily_sales = Object.values(dailyMap).sort((a,b)=>a.date<b.date?-1:1);
   const latest_date = daily_sales.length ? daily_sales[daily_sales.length-1].date : '';
 
-  return { crm:{naver:crm_naver,insta:crm_insta,tiktok:crm_tiktok}, daily_sales, channel_raw, kw_inflow_raw, kw_pay_raw, brand_search, latest_date };
+  return { crm:{naver:crm_naver,insta:crm_insta,tiktok:crm_tiktok,threads:crm_threads}, daily_sales, channel_raw, kw_inflow_raw, kw_pay_raw, brand_search, latest_date };
 }
 
 // 여러 파일 클릭 업로드 시 순차 처리
@@ -1627,14 +1647,17 @@ function renderOverview() {
   const naverCur   = getLatestCRM(DB.crm.naver);
   const instaCur   = getLatestCRM(DB.crm.insta);
   const tiktokCur  = getLatestCRM(DB.crm.tiktok);
+  const threadsCur = getLatestCRM(DB.crm.threads);
   const naverPrv1  = getPrevCRM(DB.crm.naver, 1);
   const instaPrv1  = getPrevCRM(DB.crm.insta,  1);
   const tiktokPrv1 = getPrevCRM(DB.crm.tiktok, 1);
+  const threadsPrv1= getPrevCRM(DB.crm.threads, 1);
   const naverPrv7  = getPrevCRM(DB.crm.naver, 7);
   const instaPrv7  = getPrevCRM(DB.crm.insta,  7);
   const tiktokPrv7 = getPrevCRM(DB.crm.tiktok, 7);
+  const threadsPrv7= getPrevCRM(DB.crm.threads, 7);
 
-  // KPI 4개: CRM 3채널 + 총합
+  // KPI 5개: CRM 4채널 + 총합
   document.getElementById('kpi-overview').innerHTML = `
     <div class="kpi c-green">
       <div class="kpi-label">🛍️ 스마트스토어 알림받기</div>
@@ -1654,11 +1677,17 @@ function renderOverview() {
       <div class="kpi-change">${kpiChangeHtml(tiktokCur,tiktokPrv1,'명')} <span style="font-size:9px;color:var(--text-dim)">전일比</span></div>
       <div class="kpi-sub">7일전 대비 ${kpiChangeHtml(tiktokCur,tiktokPrv7,'명')}</div>
     </div>
+    <div class="kpi" style="border-left:3px solid #0095f6">
+      <div class="kpi-label">🔗 쓰레드 팔로워</div>
+      <div class="kpi-val">${fmt(threadsCur)}<span>명</span></div>
+      <div class="kpi-change">${kpiChangeHtml(threadsCur,threadsPrv1,'명')} <span style="font-size:9px;color:var(--text-dim)">전일比</span></div>
+      <div class="kpi-sub">7일전 대비 ${kpiChangeHtml(threadsCur,threadsPrv7,'명')}</div>
+    </div>
     <div class="kpi c-orange">
       <div class="kpi-label">📊 총 CRM</div>
-      <div class="kpi-val">${fmt(naverCur+instaCur+tiktokCur)}<span>명</span></div>
+      <div class="kpi-val">${fmt(naverCur+instaCur+tiktokCur+threadsCur)}<span>명</span></div>
       <div class="kpi-change flat">전체 온드미디어 구독자</div>
-      <div class="kpi-sub">알림 ${fmt(naverCur)} · 인스타 ${fmt(instaCur)} · 틱톡 ${fmt(tiktokCur)}</div>
+      <div class="kpi-sub">알림 ${fmt(naverCur)} · 인스타 ${fmt(instaCur)} · 틱톡 ${fmt(tiktokCur)} · 쓰레드 ${fmt(threadsCur)}</div>
     </div>
   `;
 
@@ -1667,7 +1696,7 @@ function renderOverview() {
   const topKw = kwAll[0];
   const navDiff7 = naverCur - (naverPrv7||naverCur);
   let insight = '';
-  if(!naverCur && !instaCur && !tiktokCur) {
+  if(!naverCur && !instaCur && !tiktokCur && !threadsCur) {
     insight = '📂 데이터 업로드 탭에서 Excel 파일을 올려주세요.';
   } else {
     if(topKw) insight += `전체 기간 유입 1위 키워드: <b>'${topKw.keyword}'</b> (${fmt(topKw.visits)}회). `;
@@ -1687,11 +1716,13 @@ function renderOverview() {
   const navAll  = DB.crm.naver.filter(d => d.date >= oneYearStr);
   const insAll  = DB.crm.insta.filter(d => d.date >= oneYearStr);
   const tokAll  = DB.crm.tiktok.filter(d => d.date >= oneYearStr);
-  // 통합 날짜 축: 세 채널의 날짜를 합쳐서 정렬
-  const allCrmDates = [...new Set([...navAll.map(d=>d.date), ...insAll.map(d=>d.date), ...tokAll.map(d=>d.date)])].sort();
+  const thrdAll = DB.crm.threads.filter(d => d.date >= oneYearStr);
+  // 통합 날짜 축: 네 채널의 날짜를 합쳐서 정렬
+  const allCrmDates = [...new Set([...navAll.map(d=>d.date), ...insAll.map(d=>d.date), ...tokAll.map(d=>d.date), ...thrdAll.map(d=>d.date)])].sort();
   const navMap = {}; navAll.forEach(d => navMap[d.date] = d.val);
   const insMap = {}; insAll.forEach(d => insMap[d.date] = d.val);
   const tokMap = {}; tokAll.forEach(d => tokMap[d.date] = d.val);
+  const thrdMap = {}; thrdAll.forEach(d => thrdMap[d.date] = d.val);
   mkChart('chart-crm-overview', {
     type: 'line',
     data: {
@@ -1699,7 +1730,8 @@ function renderOverview() {
       datasets: [
         {label:'알림받기', data:allCrmDates.map(d=>navMap[d]??null), borderColor:C.naver, backgroundColor:'transparent', borderWidth:2, pointRadius:1, tension:0.4, yAxisID:'y', spanGaps:true},
         {label:'인스타',   data:allCrmDates.map(d=>insMap[d]??null), borderColor:C.insta, backgroundColor:'transparent', borderWidth:2, pointRadius:1, tension:0.4, yAxisID:'y2', spanGaps:true},
-        {label:'틱톡',    data:allCrmDates.map(d=>tokMap[d]??null), borderColor:C.tiktok,backgroundColor:'transparent', borderWidth:1.5, pointRadius:1, tension:0.4, yAxisID:'y3', borderDash:[4,3], spanGaps:true}
+        {label:'틱톡',    data:allCrmDates.map(d=>tokMap[d]??null), borderColor:C.tiktok,backgroundColor:'transparent', borderWidth:1.5, pointRadius:1, tension:0.4, yAxisID:'y3', borderDash:[4,3], spanGaps:true},
+        {label:'쓰레드',  data:allCrmDates.map(d=>thrdMap[d]??null), borderColor:C.threads,backgroundColor:'transparent', borderWidth:1.5, pointRadius:1, tension:0.4, yAxisID:'y3', borderDash:[2,2], spanGaps:true}
       ]
     },
     options: {
@@ -1709,7 +1741,7 @@ function renderOverview() {
         x:{grid:{color:GRID},ticks:{maxTicksLimit:12,font:{size:9}}},
         y:{grid:{color:GRID},position:'left',ticks:{callback:v=>v.toLocaleString()}},
         y2:{grid:{display:false},position:'right',ticks:{callback:v=>v.toLocaleString()}},
-        y3:{grid:{display:false},position:'right',display:true,ticks:{callback:v=>v.toLocaleString()},title:{display:true,text:'틱톡',font:{size:9},color:'#888888'},offset:true}
+        y3:{grid:{display:false},position:'right',display:true,ticks:{callback:v=>v.toLocaleString()},title:{display:true,text:'틱톡/쓰레드',font:{size:9},color:'#888888'},offset:true}
       }
     }
   });
@@ -1732,18 +1764,18 @@ function renderOverview() {
 }
 
 function renderCRM() {
-  const nav=DB.crm.naver, ins=DB.crm.insta, tok=DB.crm.tiktok;
+  const nav=DB.crm.naver, ins=DB.crm.insta, tok=DB.crm.tiktok, thrd=DB.crm.threads;
 
   // 데이터 없으면 안내
-  if(!nav.length && !ins.length && !tok.length) {
+  if(!nav.length && !ins.length && !tok.length && !thrd.length) {
     document.getElementById('crm-kpi-cards').innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px">📂 파일을 업로드하면 CRM 데이터가 표시됩니다.</div>';
     document.getElementById('insight-crm-text').innerHTML = '📂 데이터 업로드 탭에서 Excel 파일을 올려주세요.';
     return;
   }
 
-  const navCur = getLatestCRM(nav), insCur = getLatestCRM(ins), tokCur = getLatestCRM(tok);
-  const navPrv1 = getPrevCRM(nav,1),  insPrv1 = getPrevCRM(ins,1),  tokPrv1 = getPrevCRM(tok,1);
-  const navPrv7 = getPrevCRM(nav,7),  insPrv7 = getPrevCRM(ins,7),  tokPrv7 = getPrevCRM(tok,7);
+  const navCur = getLatestCRM(nav), insCur = getLatestCRM(ins), tokCur = getLatestCRM(tok), thrdCur = getLatestCRM(thrd);
+  const navPrv1 = getPrevCRM(nav,1),  insPrv1 = getPrevCRM(ins,1),  tokPrv1 = getPrevCRM(tok,1),  thrdPrv1 = getPrevCRM(thrd,1);
+  const navPrv7 = getPrevCRM(nav,7),  insPrv7 = getPrevCRM(ins,7),  tokPrv7 = getPrevCRM(tok,7),  thrdPrv7 = getPrevCRM(thrd,7);
 
   // KPI 카드
   document.getElementById('crm-kpi-cards').innerHTML = `
@@ -1764,6 +1796,12 @@ function renderCRM() {
       <div class="kpi-val">${fmt(tokCur)}<span>명</span></div>
       <div class="kpi-change">${kpiChangeHtml(tokCur,tokPrv1,'명')} <span style="font-size:9px;color:var(--text-dim)">전일比</span></div>
       <div class="kpi-sub">7일전 대비 ${kpiChangeHtml(tokCur,tokPrv7,'명')}</div>
+    </div>
+    <div class="kpi" style="border-left:3px solid #0095f6">
+      <div class="kpi-label">🔗 쓰레드 팔로워</div>
+      <div class="kpi-val">${fmt(thrdCur)}<span>명</span></div>
+      <div class="kpi-change">${kpiChangeHtml(thrdCur,thrdPrv1,'명')} <span style="font-size:9px;color:var(--text-dim)">전일比</span></div>
+      <div class="kpi-sub">7일전 대비 ${kpiChangeHtml(thrdCur,thrdPrv7,'명')}</div>
     </div>
   `;
 
@@ -1801,13 +1839,12 @@ function renderCRM() {
   mkSparkline('chart-crm-naver', nav, C.naver);
   mkSparkline('chart-crm-insta', ins, C.insta);
   mkSparkline('chart-crm-tiktok', tok, C.tiktok);
+  mkSparkline('chart-crm-threads', thrd, C.threads);
 
   // 인사이트
-  const navLatest = nav[nav.length-1]?.date || '';
-  const insLatest = ins[ins.length-1]?.date || '';
-  const tokLatest = tok[tok.length-1]?.date || '';
   const navGrowth = nav.length>1 ? navCur - nav[0].val : 0;
   const tokGrowth = tok.length>1 ? tokCur - tok[0].val : 0;
+  const thrdGrowth = thrd.length>1 ? thrdCur - thrd[0].val : 0;
 
   let txt = '';
   if(nav.length) {
@@ -1821,9 +1858,13 @@ function renderCRM() {
   if(tok.length) {
     txt += `틱톡 <b>${fmt(tokCur)}명</b>`;
     if(tok.length>1) txt += ` (첫 기록 대비 <b>+${tokGrowth}명</b>)`;
-    txt += ` — 초기 성장 단계, 콘텐츠 실험 필요.`;
+    txt += `. `;
   }
-  // txt가 비어있으면 안내문구
+  if(thrd.length) {
+    txt += `쓰레드 <b>${fmt(thrdCur)}명</b>`;
+    if(thrd.length>1) txt += ` (첫 기록 대비 <b>+${thrdGrowth}명</b>)`;
+    txt += ` — 신규 채널 성장 추이 모니터링 중.`;
+  }
   if(!txt) txt = '📂 데이터 업로드 탭에서 Excel 파일을 올려주세요.';
   document.getElementById('insight-crm-text').innerHTML = txt;
 }
