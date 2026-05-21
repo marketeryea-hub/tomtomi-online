@@ -501,7 +501,34 @@ body.unlocked .lock-notice{display:none;}
             <span>⚔️ 경쟁사 <span style="color:var(--text-muted);font-size:10px">(월 1회)</span></span>
           </label>
           <button class="btn btn-secondary" onclick="generateSlackPreview()" style="font-size:11px;padding:5px 12px;">🔄 미리보기 생성</button>
+          <button class="btn btn-secondary" onclick="toggleSlackSettings()" style="font-size:11px;padding:5px 12px;">⚙️ 고정문구</button>
           <span style="font-size:10px;color:var(--text-dim)">기간: <b id="slack-period-label">—</b></span>
+        </div>
+        <div id="slack-settings-panel" style="display:none;margin-bottom:12px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">
+          <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:10px;">⚙️ 고정문구 설정 <span style="font-weight:400;color:var(--text-muted)">(수정 후 저장하면 미리보기에 반영)</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div>
+              <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px;">📌 리포트 제목</label>
+              <input type="text" id="stpl-title" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:6px 8px;color:var(--text);font-size:11px;font-family:'Noto Sans KR',sans-serif;outline:none;" value="🍊 톰토미 마케팅 데일리 리포트">
+            </div>
+            <div>
+              <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px;">📌 CRM 섹션 제목</label>
+              <input type="text" id="stpl-crm" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:6px 8px;color:var(--text);font-size:11px;font-family:'Noto Sans KR',sans-serif;outline:none;" value="📊 CRM (온드미디어)">
+            </div>
+            <div>
+              <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px;">📌 키워드 섹션 제목</label>
+              <input type="text" id="stpl-kw" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:6px 8px;color:var(--text);font-size:11px;font-family:'Noto Sans KR',sans-serif;outline:none;" value="🔑 톰스 유입키워드 TOP 7">
+            </div>
+            <div>
+              <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px;">📌 하단 문구</label>
+              <input type="text" id="stpl-footer" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:6px 8px;color:var(--text);font-size:11px;font-family:'Noto Sans KR',sans-serif;outline:none;" value="📊 대시보드 보기: https://marketeryea-hub.github.io/tomtomi-online/">
+            </div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-primary" onclick="saveSlackTemplate()" style="font-size:11px;padding:5px 14px;">💾 저장</button>
+            <button class="btn btn-secondary" onclick="resetSlackTemplate()" style="font-size:11px;padding:5px 14px;">↩️ 초기화</button>
+            <span id="stpl-saved" style="font-size:10px;color:var(--green);display:none;">✅ 저장됨</span>
+          </div>
         </div>
         <textarea id="slack-preview" rows="16" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px;color:var(--text);font-size:11px;font-family:'Noto Sans KR',monospace;outline:none;resize:vertical;transition:border-color 0.2s;line-height:1.7;" placeholder="🔄 미리보기 생성 버튼을 눌러주세요"></textarea>
         <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
@@ -858,6 +885,50 @@ async function sendSlackFromEditor() {
   }
 }
 
+// 슬랙 고정문구 기본값
+const SLACK_TPL_DEFAULTS = {
+  title: '🍊 톰토미 마케팅 데일리 리포트',
+  crm: '📊 CRM (온드미디어)',
+  kw: '🔑 톰스 유입키워드 TOP 7',
+  footer: '📊 대시보드 보기: https://marketeryea-hub.github.io/tomtomi-online/'
+};
+
+function getSlackTemplate() {
+  try { const s = localStorage.getItem('tt-slack-tpl'); return s ? {...SLACK_TPL_DEFAULTS, ...JSON.parse(s)} : {...SLACK_TPL_DEFAULTS}; }
+  catch(e) { return {...SLACK_TPL_DEFAULTS}; }
+}
+
+function loadSlackTemplateUI() {
+  const tpl = getSlackTemplate();
+  document.getElementById('stpl-title').value = tpl.title;
+  document.getElementById('stpl-crm').value = tpl.crm;
+  document.getElementById('stpl-kw').value = tpl.kw;
+  document.getElementById('stpl-footer').value = tpl.footer;
+}
+
+function toggleSlackSettings() {
+  const panel = document.getElementById('slack-settings-panel');
+  if(panel.style.display === 'none') { panel.style.display = 'block'; loadSlackTemplateUI(); }
+  else { panel.style.display = 'none'; }
+}
+
+function saveSlackTemplate() {
+  const tpl = {
+    title: document.getElementById('stpl-title').value.trim() || SLACK_TPL_DEFAULTS.title,
+    crm: document.getElementById('stpl-crm').value.trim() || SLACK_TPL_DEFAULTS.crm,
+    kw: document.getElementById('stpl-kw').value.trim() || SLACK_TPL_DEFAULTS.kw,
+    footer: document.getElementById('stpl-footer').value.trim() || SLACK_TPL_DEFAULTS.footer
+  };
+  localStorage.setItem('tt-slack-tpl', JSON.stringify(tpl));
+  const el = document.getElementById('stpl-saved'); el.style.display='inline'; setTimeout(()=>el.style.display='none',2000);
+}
+
+function resetSlackTemplate() {
+  localStorage.removeItem('tt-slack-tpl');
+  loadSlackTemplateUI();
+  const el = document.getElementById('stpl-saved'); el.style.display='inline'; el.textContent='↩️ 초기화됨'; setTimeout(()=>{el.style.display='none';el.textContent='✅ 저장됨';},2000);
+}
+
 function generateSlackPreview() {
   const msg = buildSlackReport();
   document.getElementById('slack-preview').value = msg;
@@ -865,10 +936,11 @@ function generateSlackPreview() {
 }
 
 function buildSlackReport() {
+  const tpl = getSlackTemplate();
   const lines = [];
   // 기간 필터 반영
   const rangeLabel = (filterFrom === filterTo) ? filterFrom : filterFrom + ' ~ ' + filterTo;
-  lines.push('*🍊 톰토미 마케팅 데일리 리포트* — ' + rangeLabel);
+  lines.push('*' + tpl.title + '* — ' + rangeLabel);
   lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   // CRM
@@ -880,16 +952,16 @@ function buildSlackReport() {
   const insPct = insP1&&insP1>0?(' ('+((insD/insP1)*100).toFixed(1)+'%)'):'';
   const tokPct = tokP1&&tokP1>0?(' ('+((tokD/tokP1)*100).toFixed(1)+'%)'):'';
   const thrdPct = thrdP1&&thrdP1>0?(' ('+((thrdD/thrdP1)*100).toFixed(1)+'%)'):'';
-  lines.push('*📊 CRM (온드미디어)*');
+  lines.push('*' + tpl.crm + '*');
   lines.push('• 스마트스토어 알림받기: *' + fmt(navCur) + '명* ' + (navD>=0?'▲':'▼') + ' ' + Math.abs(navD) + '명' + navPct);
   lines.push('• 인스타그램 팔로워: *' + fmt(insCur) + '명* ' + (insD>=0?'▲':'▼') + ' ' + Math.abs(insD) + '명' + insPct);
   lines.push('• 틱톡 팔로워: *' + fmt(tokCur) + '명* ' + (tokD>=0?'▲':'▼') + ' ' + Math.abs(tokD) + '명' + tokPct);
   lines.push('• 쓰레드 팔로워: *' + fmt(thrdCur) + '명* ' + (thrdD>=0?'▲':'▼') + ' ' + Math.abs(thrdD) + '명' + thrdPct);
   lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-  // 톰스 유입키워드 TOP 7
+  // 유입키워드 TOP 7
   const kwIn = aggKwInflow('current').slice(0,7);
-  lines.push('*🔑 톰스 유입키워드 TOP 7*');
+  lines.push('*' + tpl.kw + '*');
   if(kwIn.length) {
     kwIn.forEach((k,i)=>lines.push((i+1)+'. ' + k.keyword + ' (' + k.visits + '회)'));
   } else {
@@ -920,7 +992,7 @@ function buildSlackReport() {
       lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
   }
-  lines.push('📊 대시보드 보기: https://marketeryea-hub.github.io/tomtomi-online/');
+  if(tpl.footer) lines.push(tpl.footer);
   lines.push('_톰토미 마케팅 대시보드에서 자동 생성_');
 
   return lines.join('\n');
@@ -1701,7 +1773,7 @@ function renderOverview() {
         {label:'알림받기', data:allCrmDates.map(d=>navMap[d]??null), borderColor:C.naver, backgroundColor:'transparent', borderWidth:2, pointRadius:1, tension:0.4, yAxisID:'y', spanGaps:true},
         {label:'인스타',   data:allCrmDates.map(d=>insMap[d]??null), borderColor:C.insta, backgroundColor:'transparent', borderWidth:2, pointRadius:1, tension:0.4, yAxisID:'y2', spanGaps:true},
         {label:'틱톡',    data:allCrmDates.map(d=>tokMap[d]??null), borderColor:C.tiktok,backgroundColor:'transparent', borderWidth:1.5, pointRadius:1, tension:0.4, yAxisID:'y3', borderDash:[4,3], spanGaps:true},
-        {label:'쓰레드',  data:allCrmDates.map(d=>thrdMap[d]??null), borderColor:C.threads,backgroundColor:'transparent', borderWidth:1.5, pointRadius:1, tension:0.4, yAxisID:'y3', borderDash:[2,2], spanGaps:true}
+        {label:'쓰레드',  data:allCrmDates.map(d=>thrdMap[d]??null), borderColor:C.threads,backgroundColor:'transparent', borderWidth:2.5, pointRadius:3, pointBackgroundColor:C.threads, tension:0.4, yAxisID:'y3', spanGaps:true}
       ]
     },
     options: {
