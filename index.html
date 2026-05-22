@@ -387,6 +387,7 @@ body.unlocked .lock-notice{display:none;}
     <div style="overflow-x:auto;">
       <table class="tbl" id="tbl-kw-gap"></table>
     </div>
+    <div id="kw-gap-pager" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:10px;font-size:11px;"></div>
   </div>
 
   <div class="g2">
@@ -2070,30 +2071,18 @@ function renderKeyword() {
     </div>
   `;
 
-  // 갭 분석 테이블
+  // 갭 분석 테이블 — 페이지네이션
   const gapSorted = [...gapData].sort((a,b) => {
-    // 제품기회 → 개선필요 → 효자 → 기타 순서, 같은 그룹 내에서는 유입수 내림차순
     const order = { opportunity:0, improve:1, star:2, other:3 };
     if(order[a.gapType] !== order[b.gapType]) return order[a.gapType] - order[b.gapType];
     return b.visits - a.visits;
-  }).slice(0, 20);
+  });
 
-  const gapTypeLabel = { opportunity:'🚨 제품기회', star:'⭐ 효자', improve:'🔧 개선필요', other:'—' };
-  const gapTypeColor = { opportunity:'#e74c3c', star:'#2ecc71', improve:'#f39c12', other:'var(--text-dim)' };
-
-  const gapRows = gapSorted.map(d => {
-    const cvrStr = d.cvr.toFixed(1);
-    return `<tr>
-      <td><span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:600;color:#fff;background:${gapTypeColor[d.gapType]}">${gapTypeLabel[d.gapType]}</span></td>
-      <td>${d.keyword}</td>
-      <td class="num">${fmt(d.visits)}</td>
-      <td class="num">${fmt(d.orders)}</td>
-      <td class="num">${cvrStr}%</td>
-      <td class="num" style="font-size:11px;color:var(--text-dim)">${d.payRev>0?fmt(d.payRev,'money')+'원':'—'}</td>
-    </tr>`;
-  }).join('');
-  document.getElementById('tbl-kw-gap').innerHTML =
-    `<thead><tr><th>분류</th><th>키워드</th><th style="text-align:right">유입수</th><th style="text-align:right">결제수</th><th style="text-align:right">전환율</th><th style="text-align:right">결제금액</th></tr></thead><tbody>${gapRows || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">기간 내 데이터 없음</td></tr>'}</tbody>`;
+  // 전역에 저장해서 페이지 이동 시 재사용
+  window._gapSorted = gapSorted;
+  window._gapPage = 1;
+  window._gapPerPage = 15;
+  renderGapPage(1);
 
   // ====== 기존 차트들 ======
   const top10in = kwIn.slice(0,10), top10pay = kwPay.slice(0,10);
@@ -2135,6 +2124,65 @@ function renderKeyword() {
   document.getElementById('insight-kw-text').innerHTML = ins || '기간 내 키워드 데이터가 없습니다.';
 }
 
+
+function renderGapPage(page) {
+  const data = window._gapSorted || [];
+  const perPage = window._gapPerPage || 15;
+  const totalPages = Math.max(1, Math.ceil(data.length / perPage));
+  page = Math.max(1, Math.min(page, totalPages));
+  window._gapPage = page;
+
+  const start = (page - 1) * perPage;
+  const pageData = data.slice(start, start + perPage);
+
+  const gapTypeLabel = { opportunity:'🚨 제품기회', star:'⭐ 효자', improve:'🔧 개선필요', other:'—' };
+  const gapTypeColor = { opportunity:'#e74c3c', star:'#2ecc71', improve:'#f39c12', other:'var(--text-dim)' };
+
+  const gapRows = pageData.map(d => {
+    const cvrStr = d.cvr.toFixed(1);
+    return `<tr>
+      <td><span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:600;color:#fff;background:${gapTypeColor[d.gapType]}">${gapTypeLabel[d.gapType]}</span></td>
+      <td>${d.keyword}</td>
+      <td class="num">${fmt(d.visits)}</td>
+      <td class="num">${fmt(d.orders)}</td>
+      <td class="num">${cvrStr}%</td>
+      <td class="num" style="font-size:11px;color:var(--text-dim)">${d.payRev>0?fmt(d.payRev,'money')+'원':'—'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tbl-kw-gap').innerHTML =
+    `<thead><tr><th>분류</th><th>키워드</th><th style="text-align:right">유입수</th><th style="text-align:right">결제수</th><th style="text-align:right">전환율</th><th style="text-align:right">결제금액</th></tr></thead><tbody>${gapRows || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">기간 내 데이터 없음</td></tr>'}</tbody>`;
+
+  // 페이지네이션 UI
+  const pager = document.getElementById('kw-gap-pager');
+  if(data.length <= perPage) { pager.innerHTML = ''; return; }
+
+  let pagerHtml = '';
+  const btnStyle = 'padding:4px 10px;border:1px solid var(--border);border-radius:5px;background:var(--surface2);color:var(--text);font-size:11px;cursor:pointer;';
+  const btnActiveStyle = 'padding:4px 10px;border:1px solid var(--orange);border-radius:5px;background:var(--orange);color:#fff;font-size:11px;font-weight:700;cursor:pointer;';
+  const btnDisabled = 'padding:4px 10px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text-dim);font-size:11px;cursor:default;opacity:0.4;';
+
+  // 이전 버튼
+  pagerHtml += `<button style="${page<=1?btnDisabled:btnStyle}" ${page<=1?'disabled':''} onclick="renderGapPage(${page-1})">◀ 이전</button>`;
+
+  // 페이지 번호들
+  const maxBtns = 5;
+  let startP = Math.max(1, page - Math.floor(maxBtns/2));
+  let endP = Math.min(totalPages, startP + maxBtns - 1);
+  if(endP - startP + 1 < maxBtns) startP = Math.max(1, endP - maxBtns + 1);
+
+  for(let p = startP; p <= endP; p++) {
+    pagerHtml += `<button style="${p===page?btnActiveStyle:btnStyle}" onclick="renderGapPage(${p})">${p}</button>`;
+  }
+
+  // 다음 버튼
+  pagerHtml += `<button style="${page>=totalPages?btnDisabled:btnStyle}" ${page>=totalPages?'disabled':''} onclick="renderGapPage(${page+1})">다음 ▶</button>`;
+
+  // 정보 표시
+  pagerHtml += `<span style="color:var(--text-muted);font-size:10px;margin-left:6px;">${start+1}~${Math.min(start+perPage, data.length)} / 총 ${data.length}개</span>`;
+
+  pager.innerHTML = pagerHtml;
+}
 
 function setCompMode(mode) {
   window._compMode = mode;
