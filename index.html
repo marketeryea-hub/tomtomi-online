@@ -369,6 +369,26 @@ body.unlocked .lock-notice{display:none;}
     <div id="insight-kw-text">데이터 로딩 중...</div>
   </div>
 
+  <!-- 유입 vs 결제 갭 분석 (NEW) -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-hd">
+      <div class="card-title">🔍 유입 vs 결제 갭 분석</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span style="font-size:10px;color:var(--text-muted)">최소 유입:</span>
+        <select id="gap-min-visits" onchange="renderKeyword()" style="font-size:10px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);outline:none;">
+          <option value="3">3회+</option>
+          <option value="5" selected>5회+</option>
+          <option value="10">10회+</option>
+          <option value="20">20회+</option>
+        </select>
+      </div>
+    </div>
+    <div class="g3" id="kw-gap-cards" style="margin:12px 0;"></div>
+    <div style="overflow-x:auto;">
+      <table class="tbl" id="tbl-kw-gap"></table>
+    </div>
+  </div>
+
   <div class="g2">
     <div class="card">
       <div class="card-hd"><div class="card-title">TOP 유입 키워드</div><div class="chip" id="chip-kw-in">—</div></div>
@@ -2003,6 +2023,79 @@ function renderKeyword() {
   document.getElementById('chip-kw-in').textContent = filterRangeLabel();
   document.getElementById('chip-kw-pay').textContent = filterRangeLabel();
 
+  // ====== 유입 vs 결제 갭 분석 ======
+  const minVisits = parseInt(document.getElementById('gap-min-visits')?.value || '5');
+  // 결제 키워드를 맵으로
+  const payMap = {};
+  kwPay.forEach(k => { payMap[k.keyword] = k; });
+  // 갭 데이터 생성: 유입 키워드에 결제 데이터를 매칭
+  const gapData = kwIn.filter(k => k.visits >= minVisits).map(k => {
+    const pay = payMap[k.keyword];
+    const orders = k.orders || 0;
+    const payOrders = pay ? (pay.orders||0) : 0;
+    const payRev = pay ? (pay.revenue||0) : 0;
+    const cvr = k.visits > 0 ? (orders / k.visits * 100) : 0;
+    // 갭 타입 분류
+    let gapType = '';
+    if(orders === 0 && k.visits >= minVisits) gapType = 'opportunity'; // 유입 있지만 결제 0 = 제품 기회
+    else if(cvr >= 5) gapType = 'star'; // 고전환 = 효자 키워드
+    else if(cvr > 0 && cvr < 5) gapType = 'improve'; // 전환 있지만 낮음 = 개선 필요
+    else gapType = 'other';
+    return { ...k, payOrders, payRev, cvr, gapType };
+  });
+
+  const opportunities = gapData.filter(d => d.gapType === 'opportunity');
+  const stars = gapData.filter(d => d.gapType === 'star');
+  const improves = gapData.filter(d => d.gapType === 'improve');
+
+  // 갭 분석 KPI 카드 3개
+  document.getElementById('kw-gap-cards').innerHTML = `
+    <div class="kpi" style="border-left:3px solid #e74c3c;">
+      <div class="kpi-label">🚨 제품 기회 키워드</div>
+      <div class="kpi-val">${opportunities.length}<span>개</span></div>
+      <div class="kpi-change flat">유입 ${minVisits}회+ 결제 0건</div>
+      <div class="kpi-sub" style="font-size:10px;color:var(--text-dim)">${opportunities.slice(0,3).map(d=>d.keyword).join(', ')||'없음'}</div>
+    </div>
+    <div class="kpi" style="border-left:3px solid #2ecc71;">
+      <div class="kpi-label">⭐ 효자 키워드</div>
+      <div class="kpi-val">${stars.length}<span>개</span></div>
+      <div class="kpi-change flat">전환율 5%+</div>
+      <div class="kpi-sub" style="font-size:10px;color:var(--text-dim)">${stars.slice(0,3).map(d=>d.keyword).join(', ')||'없음'}</div>
+    </div>
+    <div class="kpi" style="border-left:3px solid #f39c12;">
+      <div class="kpi-label">🔧 개선 필요 키워드</div>
+      <div class="kpi-val">${improves.length}<span>개</span></div>
+      <div class="kpi-change flat">전환율 0~5% (개선 여지)</div>
+      <div class="kpi-sub" style="font-size:10px;color:var(--text-dim)">${improves.slice(0,3).map(d=>d.keyword).join(', ')||'없음'}</div>
+    </div>
+  `;
+
+  // 갭 분석 테이블
+  const gapSorted = [...gapData].sort((a,b) => {
+    // 제품기회 → 개선필요 → 효자 → 기타 순서, 같은 그룹 내에서는 유입수 내림차순
+    const order = { opportunity:0, improve:1, star:2, other:3 };
+    if(order[a.gapType] !== order[b.gapType]) return order[a.gapType] - order[b.gapType];
+    return b.visits - a.visits;
+  }).slice(0, 20);
+
+  const gapTypeLabel = { opportunity:'🚨 제품기회', star:'⭐ 효자', improve:'🔧 개선필요', other:'—' };
+  const gapTypeColor = { opportunity:'#e74c3c', star:'#2ecc71', improve:'#f39c12', other:'var(--text-dim)' };
+
+  const gapRows = gapSorted.map(d => {
+    const cvrStr = d.cvr.toFixed(1);
+    return `<tr>
+      <td><span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:600;color:#fff;background:${gapTypeColor[d.gapType]}">${gapTypeLabel[d.gapType]}</span></td>
+      <td>${d.keyword}</td>
+      <td class="num">${fmt(d.visits)}</td>
+      <td class="num">${fmt(d.orders)}</td>
+      <td class="num">${cvrStr}%</td>
+      <td class="num" style="font-size:11px;color:var(--text-dim)">${d.payRev>0?fmt(d.payRev,'money')+'원':'—'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tbl-kw-gap').innerHTML =
+    `<thead><tr><th>분류</th><th>키워드</th><th style="text-align:right">유입수</th><th style="text-align:right">결제수</th><th style="text-align:right">전환율</th><th style="text-align:right">결제금액</th></tr></thead><tbody>${gapRows || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">기간 내 데이터 없음</td></tr>'}</tbody>`;
+
+  // ====== 기존 차트들 ======
   const top10in = kwIn.slice(0,10), top10pay = kwPay.slice(0,10);
   mkChart('chart-kw-in',{type:'bar',data:{labels:top10in.map(d=>d.keyword),datasets:[{label:'유입수',data:top10in.map(d=>d.visits),backgroundColor:'rgba(217,95,43,0.65)',borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:GRID}},y:{grid:{display:false},ticks:{font:{size:10}}}}}});
   const top10payByOrders = [...kwPay].sort((a,b)=>b.orders-a.orders).slice(0,10);
@@ -2024,13 +2117,21 @@ function renderKeyword() {
     `<thead><tr><th>#</th><th>키워드</th><th style="text-align:right">결제수 (14일기여)</th><th style="text-align:right">결제금액 참고</th></tr></thead><tbody>` +
     tblPayData.map((d,i)=>`<tr><td><span class="rank ${['r1','r2','r3'][i]||''}">${i+1}</span></td><td>${d.keyword}</td><td class="num"><b>${fmt(Math.round(d.orders))}건</b></td><td class="num" style="color:var(--text-dim);font-size:11px">${fmt(d.revenue,'money')}원</td></tr>`).join('') + '</tbody>';
 
-  // 인사이트
-  const highConv = kwIn.filter(k=>k.visits>=5 && k.orders/k.visits>=0.05).slice(0,3);
-  const zeroConv = kwIn.filter(k=>k.visits>=10 && k.orders===0).slice(0,3);
+  // 인사이트 — 갭 분석 기반으로 업그레이드
   let ins = '';
-  if(highConv.length) ins += `고전환 키워드: <b>${highConv.map(k=>k.keyword).join(', ')}</b> — 광고 집중 투자 추천. `;
-  if(zeroConv.length) ins += `유입은 많으나 전환 0인 키워드: <b>${zeroConv.map(k=>k.keyword).join(', ')}</b> — 상세페이지 개선 또는 키워드 제외 검토. `;
-  if(kwIn[0]) ins += `유입 1위 '<b>${kwIn[0].keyword}</b>'의 전환율은 ${kwIn[0].visits>0?(kwIn[0].orders/kwIn[0].visits*100).toFixed(1):0}%.`;
+  if(opportunities.length) {
+    ins += `🚨 <b>${opportunities.length}개 키워드</b>에서 유입이 발생하지만 결제가 없습니다: <b>${opportunities.slice(0,3).map(d=>d.keyword+'('+d.visits+'회)').join(', ')}</b>`;
+    ins += ` — 관련 제품이 없거나 상세페이지 매칭이 안 될 가능성이 높습니다. `;
+  }
+  if(stars.length) {
+    ins += `⭐ 효자 키워드 ${stars.length}개: <b>${stars.slice(0,3).map(d=>d.keyword+'('+d.cvr.toFixed(1)+'%)').join(', ')}</b> — 광고 집중 투자 추천. `;
+  }
+  if(improves.length) {
+    ins += `🔧 전환율이 낮은 키워드 ${improves.length}개 — 상세페이지 A/B 테스트 검토. `;
+  }
+  if(!ins && kwIn[0]) {
+    ins += `유입 1위 '<b>${kwIn[0].keyword}</b>'의 전환율은 ${kwIn[0].visits>0?(kwIn[0].orders/kwIn[0].visits*100).toFixed(1):0}%.`;
+  }
   document.getElementById('insight-kw-text').innerHTML = ins || '기간 내 키워드 데이터가 없습니다.';
 }
 
