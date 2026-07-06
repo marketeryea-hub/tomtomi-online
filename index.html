@@ -492,8 +492,9 @@ body.unlocked .lock-notice{display:none;}
         <div style="font-size:12px;color:var(--text-muted);line-height:2.2">
           <div><strong style="color:var(--text)">① 전체채널_날짜.xlsx</strong></div>
           <div style="margin-left:12px">스마트스토어센터 → 데이터분석 → 마케팅분석 → 전체채널</div>
-          <div style="margin-top:8px"><strong style="color:var(--text)">② 검색채널_날짜.xlsx</strong></div>
-          <div style="margin-left:12px">스마트스토어센터 → 통계 → 마케팅분석 → 검색채널</div>
+          <div style="margin-top:8px"><strong style="color:var(--text)">② 검색키워드 (아래 중 하나)</strong></div>
+          <div style="margin-left:12px">• <b>신규:</b> query_날짜.xlsx — 스마트스토어센터 → 유입키워드(검색)</div>
+          <div style="margin-left:12px">• <s style="color:var(--text-dim)">구버전: 검색채널_날짜.xlsx — 통계 → 마케팅분석 → 검색채널</s></div>
           <div style="margin-top:8px"><strong style="color:var(--text)">③ 상품_검색채널_날짜.xlsx</strong></div>
           <div style="margin-left:12px">스마트스토어센터 → 데이터분석 → 판매분석 → 상품/검색채널</div>
           <div style="margin-top:10px;padding:8px 10px;background:rgba(42,157,110,0.08);border-radius:7px;font-size:11px;color:#207a52">
@@ -633,10 +634,10 @@ async function loadCRMFromSheet() {
       if(!r[ci.date]) continue;
       const d = fmtDateStr(r[ci.date]);
       if(!d) continue;
-      const vNav = parseInt(r[ci.nav]); if(!isNaN(vNav) && vNav>0) naver.push({date:d, val:vNav});
-      const vIns = parseInt(r[ci.ins]); if(!isNaN(vIns) && vIns>0) insta.push({date:d, val:vIns});
-      const vTok = parseInt(r[ci.tok]); if(!isNaN(vTok) && vTok>0) tiktok.push({date:d, val:vTok});
-      const vThrd = parseInt(r[ci.thrd]); if(!isNaN(vThrd) && vThrd>0) threads.push({date:d, val:vThrd});
+      const vNav = parseInt(String(r[ci.nav]||'').replace(/,/g,'')); if(!isNaN(vNav) && vNav>0) naver.push({date:d, val:vNav});
+      const vIns = parseInt(String(r[ci.ins]||'').replace(/,/g,'')); if(!isNaN(vIns) && vIns>0) insta.push({date:d, val:vIns});
+      const vTok = parseInt(String(r[ci.tok]||'').replace(/,/g,'')); if(!isNaN(vTok) && vTok>0) tiktok.push({date:d, val:vTok});
+      const vThrd = parseInt(String(r[ci.thrd]||'').replace(/,/g,'')); if(!isNaN(vThrd) && vThrd>0) threads.push({date:d, val:vThrd});
     }
     // 날짜 오름차순 정렬
     [naver, insta, tiktok, threads].forEach(arr => arr.sort((a,b)=>a.date<b.date?-1:1));
@@ -836,9 +837,9 @@ async function loadCompetitorFromSheet() {
       const month = fmtMonthStr(r[ci.month]);
       const brand = String(r[ci.brand]||'').trim();
       if(!month || !brand) continue;
-      const mo    = parseFloat(r[ci.mo])||0;
-      const pc    = parseFloat(r[ci.pc])||0;
-      const total = parseFloat(r[ci.total])||mo+pc;
+      const mo    = parseFloat(String(r[ci.mo]||'').replace(/,/g,''))||0;
+      const pc    = parseFloat(String(r[ci.pc]||'').replace(/,/g,''))||0;
+      const total = parseFloat(String(r[ci.total]||'').replace(/,/g,''))||mo+pc;
       if(!bs[brand]) bs[brand] = { dates:[], mo:[], pc:[], vals:[] };
       bs[brand].dates.push(month);
       bs[brand].mo.push(mo);
@@ -1406,6 +1407,20 @@ async function handleUpload(input) {
       status.style.color='var(--green)';
       status.textContent='✅ 상품_검색채널 저장 완료! (' + dateStr + ' · ' + incoming.length + '건)';
 
+    } else if(fileType === 'query_new') {
+      // 네이버 신규 검색키워드 포맷 — 날짜가 데이터 안에 있음
+      const { records, dates } = parseNewQuery(sheets['QUERY']);
+      DB.kw_inflow_raw = mergeByDate(DB.kw_inflow_raw, records, r=>r.keyword+'|'+r.group);
+      status.style.color='var(--text-muted)';
+      status.textContent='💾 Supabase 저장 중...';
+      // 날짜별로 저장
+      for(const d of dates) {
+        const dayRecords = records.filter(r => r.date === d);
+        await saveToSupabase('kw_inflow', dayRecords, d);
+      }
+      status.style.color='var(--green)';
+      status.textContent='✅ 검색키워드(신규) 저장 완료! (' + dates.join(', ') + ' · ' + records.length + '건)';
+
     } else {
       // 기존 통합 엑셀 파일 — 과거 데이터 복원 후 기존 로우파일 데이터와 병합
       const parsed = parseSheets(sheets);
@@ -1526,6 +1541,7 @@ function detectRawFileType(sheets) {
   if(names.includes('전체채널'))     return 'channel';
   if(names.includes('검색채널'))     return 'kw_inflow';
   if(names.includes('상품_검색채널')) return 'kw_pay';
+  if(names.includes('QUERY'))       return 'query_new';  // 네이버 신규 검색키워드 포맷
   return null;
 }
 
@@ -1594,6 +1610,63 @@ function parseRawKwInflow(sheet, dateStr) {
   }
   console.log('검색채널 파싱결과:', records.length, '건 / 샘플:', records[0]);
   return records;
+}
+
+// 네이버 신규 검색키워드 포맷 (QUERY 시트)
+// 컬럼: 날짜, 경로(1단계), 검색어, 방문수, 상품결제건수, 구매전환율, 판매금액(총), 상품결제단가
+function parseNewQuery(sheet) {
+  const hdr = (sheet[0] || []).map(v => String(v||'').trim());
+  const findCol = (hdr, ...candidates) => {
+    for(const c of candidates) {
+      const i = hdr.findIndex(h => h.includes(c));
+      if(i>=0) return i;
+    }
+    return -1;
+  };
+  const idx = {
+    date:    findCol(hdr, '날짜'),
+    path:    findCol(hdr, '경로'),
+    keyword: findCol(hdr, '검색어'),
+    visits:  findCol(hdr, '방문수'),
+    orders:  findCol(hdr, '상품결제건수', '결제건수'),
+    revenue: findCol(hdr, '판매금액', '결제금액')
+  };
+  console.log('QUERY(신규) 헤더:', hdr, '/ idx:', idx);
+  const records = [];
+  const dates = new Set();
+  for(let i=1; i<sheet.length; i++) {
+    const r = sheet[i] || [];
+    const kw = String(r[idx.keyword]||'').trim();
+    // "전체" 집계행은 스킵
+    if(!kw || kw==='전체' || kw==='undefined') continue;
+    // 날짜 포맷 변환 (YYYY-MM-DD 또는 Date 객체)
+    let dateVal = r[idx.date];
+    let dateStr = '';
+    if(dateVal instanceof Date) {
+      dateStr = dateVal.toISOString().split('T')[0];
+    } else {
+      dateStr = fmtDateStr(dateVal);
+    }
+    if(!dateStr) continue;
+    dates.add(dateStr);
+    const path = String(r[idx.path]||'').trim();
+    // 경로(1단계)를 기존 채널그룹과 매핑
+    let group = path;
+    if(path.includes('네이버 광고') || path.includes('광고')) group = '네이버광고';
+    else if(path.includes('네이버') || path.includes('검색')) group = '네이버검색';
+    else if(path === '전체') continue; // 경로도 '전체'인 행은 스킵
+    records.push({
+      date:    dateStr,
+      keyword: kw,
+      group:   group,
+      visits:  Number(r[idx.visits])||0,
+      revenue: Number(r[idx.revenue])||0,
+      orders:  Number(r[idx.orders])||0
+    });
+  }
+  const dateList = [...dates].sort();
+  console.log('QUERY(신규) 파싱결과:', records.length, '건 / 날짜:', dateList.join(', '), '/ 샘플:', records[0]);
+  return { records, dates: dateList };
 }
 
 function parseRawKwPay(sheet, dateStr) {
